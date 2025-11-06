@@ -5,6 +5,7 @@ import base64
 import binascii
 import logging
 import os
+import re
 import shutil
 import socket
 import tempfile
@@ -2086,6 +2087,186 @@ async def service_content(
         raise HTTPException(status_code=500, detail=f"读取文件时发生内部错误: {e}")
 
 
+
+# 上传文件
+class ConvertServiceRequest(BaseModel):
+    file_name: str = Field(
+        ...,
+        description="上传的原始文件名，含扩展名。",
+        examples=[
+            "dialogue.docx",
+            "my_paper.pdf",
+            "chapter1.txt",
+        ],
+    )
+    file_content: str = Field(
+        ..., description="Base64编码的文件内容。", examples=["JVBERi0xLjQK..."]
+    )
+
+# word2html转换任务
+async def _start_word2html_task(
+    file_contents: bytes,
+    original_filename: str,
+):
+    # 创建工作流
+    html_exporter_config = Docx2HTMLExporterConfig(cdn=False)
+    workflow_config = DocxWorkflowConfig(
+        translator_config=DocxTranslatorConfig(),
+        html_exporter_config=html_exporter_config,
+    )
+    workflow = DocxWorkflow(config=workflow_config)
+    # 读取文件内容
+    file_stem = Path(original_filename).stem
+    file_suffix = Path(original_filename).suffix
+    workflow.read_bytes(content=file_contents, stem=file_stem, suffix=file_suffix)
+    content = workflow.convert_to_html_async()
+    content_bytes = content.encode("utf-8")
+
+    return {
+        "filename": f"{file_stem}.html",
+        "content": base64.b64encode(content_bytes).decode("utf-8"),
+    }
+
+# word的(Base64格式)转html
+@service_router.post(
+    "/word2html",
+    summary="将Word(Base64格式)文档转换为HTML",
+    description="""
+    将Word(Base64格式)文档转换为HTML。
+    
+    - **返回结构**: 返回一个JSON对象，包含文件名、文件内容的Base64编码字符串。
+    - **内容编码**: 文件内容总是以 **Base64** 编码，客户端需要自行解码才能使用。
+    """,
+    responses={
+        200: {
+            "description": "成功返回HTML内容。",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "html_base64": {
+                            "summary": "HTML 内容 (Base64)",
+                            "value": {
+                                "filename": "my_doc_translated.html",
+                                "content": "PGh0bWw+PGhlYWQ+...",
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        400: {"description": "请求体无效，例如Base64解码失败。"},
+        500: {"description": "启动后台任务时发生未知错误。"},
+    }
+)
+async def service_word2html(
+        request: ConvertServiceRequest = Body(
+            ..., description="翻译任务的详细参数和文件内容。"
+        )
+):
+    # 通过正则去掉Base64标记
+    if request.file_content:
+        request.file_content = re.sub(r"^data:application/[^;]+;base64,", "", request.file_content)
+        try:
+            file_contents = base64.b64decode(request.file_content)
+        except binascii.Error as e:
+            raise HTTPException(status_code=400, detail=f"无效的Base64文件内容: {e}")
+    else:
+        raise HTTPException(status_code=400, detail=f"无效的Base64文件内容")
+    try:
+        response_data = await _start_word2html_task(
+            file_contents=file_contents,
+            original_filename=request.file_name,
+        )
+        return JSONResponse(content=response_data)
+    except HTTPException as e:
+        if e.status_code == 500:
+            return JSONResponse(
+                status_code=e.status_code,
+                content={"task_started": False, "message": e.detail},
+            )
+        raise e
+
+# html2word转换任务
+async def _start_html2word_task(
+    file_contents: bytes,
+    original_filename: str,
+):
+    # 创建工作流
+    workflow_config = HtmlWorkflowConfig(
+        translator_config=HtmlTranslatorConfig()
+    )
+    workflow = HtmlWorkflow(config=workflow_config)
+    # 读取文件内容
+    file_stem = Path(original_filename).stem
+    file_suffix = Path(original_filename).suffix
+    workflow.read_bytes(content=file_contents, stem=file_stem, suffix=file_suffix)
+    content_bytes = workflow.convert_to_word()
+
+    return {
+        "filename": f"{file_stem}.docx",
+        "content": base64.b64encode(content_bytes).decode("utf-8"),
+    }
+
+# Html的(Base64格式)转Word
+@service_router.post(
+    "/html2word",
+    summary="将HTML(Base64格式)文档转换为Word",
+    description="""
+    将HTML(Base64格式)文档转换为Word。
+    
+    - **返回结构**: 响应包含一个JSON对象，包含文件名、文件内容的Base64编码字符串。
+    - **内容编码**: 文件内容总是以 **Base64** 编码，客户端需要自行解码才能使用。
+    """,
+    responses={
+        200: {
+            "description": "成功返回Word内容。",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "word_base64": {
+                            "summary": "Word 内容 (Base64)",
+                            "value": {
+                                "filename": "my_doc_translated.docx",
+                                "content": "UEsDBBQACAgIAD...",
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        400: {"description": "请求体无效，例如Base64解码失败。"},
+        500: {"description": "启动后台任务时发生未知错误。"},
+    }
+)
+async def service_html2word(
+        request: ConvertServiceRequest = Body(
+            ..., description="翻译任务的详细参数和文件内容。"
+        )
+):
+    # 通过正则去掉Base64标记
+    if request.file_content:
+        request.file_content = re.sub(r"^data:text/[^;]+;base64,", "", request.file_content)
+        try:
+            file_contents = base64.b64decode(request.file_content)
+        except binascii.Error as e:
+            raise HTTPException(status_code=400, detail=f"无效的Base64文件内容: {e}")
+    else:
+        raise HTTPException(status_code=400, detail=f"无效的Base64文件内容")
+    try:
+        response_data = await _start_html2word_task(
+            file_contents=file_contents,
+            original_filename=request.file_name,
+        )
+        return JSONResponse(content=response_data)
+    except HTTPException as e:
+        if e.status_code == 500:
+            return JSONResponse(
+                status_code=e.status_code,
+                content={"task_started": False, "message": e.detail},
+            )
+        raise e
+
+
 # ===================================================================
 # --- 应用主路由和启动 ---
 # ===================================================================
@@ -2235,7 +2416,7 @@ def find_free_port(start_port):
 
 
 def run_app(port: int | None = None):
-    initial_port = port or int(os.environ.get("DOCUTRANSLATE_PORT", 8010))
+    initial_port = port or int(os.environ.get("DOCUTRANSLATE_PORT", 8082))
     try:
         port_to_use = find_free_port(initial_port)
         if port_to_use != initial_port:

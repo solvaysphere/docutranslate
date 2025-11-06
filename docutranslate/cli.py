@@ -19,7 +19,7 @@ def main():
         "-p", "--port",
         type=int,  # 指定参数类型（例如整数）
         default=None,  # 默认值（可选）
-        help="指定端口号（默认：8010）。"
+        help="指定端口号（默认：8082）。"
     )
 
     parser.add_argument(
