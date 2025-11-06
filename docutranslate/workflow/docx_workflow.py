@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2025 QinHan
 # SPDX-License-Identifier: MPL-2.0
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
@@ -69,7 +70,11 @@ class DocxWorkflow(Workflow[DocxWorkflowConfig, Document, Document], HTMLExporta
 
     def export_to_html(self, config: Docx2HTMLExporterConfig = None) -> str:
         config = config or self.config.html_exporter_config
+        start_time = time.time()
         docu = self._export(Docx2HTMLExporter(config))
+        end_time = time.time()
+        duration = end_time - start_time
+        self.logger.info(f"导出Html完成，用时 {duration:.2f} 秒。")
         return docu.content.decode()
 
     def export_to_docx(self, _: ExporterConfig | None = None) -> bytes:
@@ -86,3 +91,23 @@ class DocxWorkflow(Workflow[DocxWorkflowConfig, Document, Document], HTMLExporta
                      _: ExporterConfig | None = None) -> Self:
         self._save(exporter=Docx2DocxExporter(), name=name, output_dir=output_dir)
         return self
+
+    def convert_to_html(self, config: Docx2HTMLExporterConfig = None):
+        config = config or self.config.html_exporter_config
+        start_time = time.time()
+        exporter = Docx2HTMLExporter(config)
+        docu = exporter.export(self.document_original)
+        end_time = time.time()
+        duration = end_time - start_time
+        self.logger.info(f"转换Html完成，用时 {duration:.2f} 秒。")
+        return docu.content.decode()
+
+    def convert_to_html_async(self, config: Docx2HTMLExporterConfig = None):
+        config = config or self.config.html_exporter_config
+        start_time = time.time()
+        exporter = Docx2HTMLExporter(config)
+        docu = exporter.export_async(self.document_original)
+        end_time = time.time()
+        duration = end_time - start_time
+        self.logger.info(f"多线程转换Html完成，用时 {duration:.2f} 秒。")
+        return docu.content.decode()
