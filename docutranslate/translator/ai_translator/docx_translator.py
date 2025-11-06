@@ -156,7 +156,8 @@ class DocxTranslator(AiTranslator):
     # ---------- 代码修改部分 1: 形状翻译逻辑的核心实现 ----------
     def _process_element_children(self, element, parent_paragraph: Paragraph, elements: List[Dict[str, Any]],
                                   texts: List[str],
-                                  state: Dict[str, Any]):
+                                  state: Dict[str, Any],
+                                  top_level_para: Paragraph):
 
         def flush_segment():
             current_runs = state['current_runs']
@@ -164,8 +165,13 @@ class DocxTranslator(AiTranslator):
                 return
             full_text = "".join(r.text for r in current_runs)
             if full_text.strip():
-                # 在 elements 中增加对父段落的引用
-                elements.append({"type": "text_runs", "runs": list(current_runs), "paragraph": parent_paragraph})
+                # 在 elements 中增加对父段落和顶级段落的引用
+                elements.append({
+                    "type": "text_runs",
+                    "runs": list(current_runs),
+                    "paragraph": parent_paragraph,
+                    "top_level_paragraph": top_level_para
+                })
                 texts.append(full_text)
             state['current_runs'].clear()
 
@@ -175,7 +181,7 @@ class DocxTranslator(AiTranslator):
 
             if child.tag in self.RECURSIVE_CONTAINER_TAGS:
                 flush_segment()
-                self._process_element_children(child, parent_paragraph, elements, texts, state)
+                self._process_element_children(child, parent_paragraph, elements, texts, state, top_level_para)
                 flush_segment()  # 在递归容器后也刷新，确保其内容成为独立片段
                 continue
 
@@ -202,8 +208,8 @@ class DocxTranslator(AiTranslator):
                             for p_element in txbx_content.findall(qn('w:p')):
                                 # 创建新的段落对象，并传入父级上下文
                                 shape_para = Paragraph(p_element, parent_paragraph)
-                                # 递归处理该段落
-                                self._process_paragraph(shape_para, elements, texts)
+                                # 递归处理该段落，并传递顶级段落上下文
+                                self._process_paragraph(shape_para, elements, texts, top_level_para=top_level_para)
 
                         # 如果处理了形状内的文本，则该 Run 的任务已完成
                         continue
@@ -224,19 +230,29 @@ class DocxTranslator(AiTranslator):
                 # 遇到任何非 Run 的块级元素（如在单元格中嵌套的表格），都应结束当前文本片段。
                 flush_segment()
 
-    def _process_paragraph(self, para: Paragraph, elements: List[Dict[str, Any]], texts: List[str]):
+    def _process_paragraph(self, para: Paragraph, elements: List[Dict[str, Any]], texts: List[str],
+                         top_level_para: Paragraph = None):
+        # 如果是首次进入段落处理（非递归调用），则当前段落是顶级段落
+        if top_level_para is None:
+            top_level_para = para
+
         state = {
             'current_runs': [],
         }
-        # 修改调用：传入 `para` 对象作为父级上下文
-        self._process_element_children(para._p, para, elements, texts, state)
+        # 修改调用：传入 `para` 对象、其顶级上下文
+        self._process_element_children(para._p, para, elements, texts, state, top_level_para)
 
         # 确保在段落处理结束时，刷新所有剩余的 Run
         current_runs = state['current_runs']
         if current_runs:
             full_text = "".join(r.text for r in current_runs)
             if full_text.strip():
-                elements.append({"type": "text_runs", "runs": list(current_runs), "paragraph": para})
+                elements.append({
+                    "type": "text_runs",
+                    "runs": list(current_runs),
+                    "paragraph": para,
+                    "top_level_paragraph": top_level_para
+                })
                 texts.append(full_text)
             current_runs.clear()
 
@@ -334,7 +350,71 @@ class DocxTranslator(AiTranslator):
                         self.logger.debug(f"尝试删除一个不存在的run元素。这通常是安全的。")
                         pass
 
-    # ---------- 代码修改部分：重写 _after_translate 方法 ----------
+    # ---------- FIX START: 新增用于清理副本段落的辅助方法 ----------
+    def _prune_unwanted_elements_from_copy(self, p_element: OxmlElement):
+        """
+        从复制的段落元素中移除包含图片或页码字段的 Run。
+        这可以防止在“append”和“prepend”模式下出现重复。
+        """
+        runs_to_remove = []
+        runs = p_element.findall(qn('w:r'))
+
+        i = 0
+        while i < len(runs):
+            run_element = runs[i]
+
+            # 检查图片
+            if run_element.find(qn('w:drawing')) is not None or run_element.find(qn('w:pict')) is not None:
+                runs_to_remove.append(run_element)
+                i += 1
+                continue
+
+            # 检查页码字段
+            fldChar = run_element.find(qn('w:fldChar'))
+            if fldChar is not None and fldChar.get(qn('w:fldCharType')) == 'begin':
+                is_page_field = False
+                field_end_index = -1
+
+                # 向前查找以确定是否是页码字段
+                for j in range(i + 1, len(runs)):
+                    next_run = runs[j]
+                    instrText = next_run.find(qn('w:instrText'))
+                    if instrText is not None and instrText.text is not None:
+                        text = instrText.text.strip().upper()
+                        if 'PAGE' in text or 'NUMPAGES' in text:
+                            is_page_field = True
+                        break
+
+                    next_fldChar = next_run.find(qn('w:fldChar'))
+                    if next_fldChar is not None and next_fldChar.get(qn('w:fldCharType')) == 'begin':
+                        break
+
+                if is_page_field:
+                    # 如果是页码字段，则找到其结束标记并标记整个字段的 runs
+                    field_runs_to_remove = [run_element]
+                    end_found = False
+                    for j in range(i + 1, len(runs)):
+                        field_run = runs[j]
+                        field_runs_to_remove.append(field_run)
+                        end_fldChar = field_run.find(qn('w:fldChar'))
+                        if end_fldChar is not None and end_fldChar.get(qn('w:fldCharType')) == 'end':
+                            end_found = True
+                            field_end_index = j
+                            break
+
+                    if end_found:
+                        runs_to_remove.extend(field_runs_to_remove)
+                        i = field_end_index + 1
+                        continue
+            i += 1
+
+        # 从 XML 树中实际移除被标记的 runs
+        for run_to_remove in runs_to_remove:
+            if run_to_remove.getparent() is not None:
+                p_element.remove(run_to_remove)
+
+    # ---------- FIX END ----------
+
     def _after_translate(self, doc: DocumentObject, elements: List[Dict[str, Any]], translated: List[str],
                          originals: List[str]) -> bytes:
         if len(elements) != len(translated):
@@ -348,80 +428,102 @@ class DocxTranslator(AiTranslator):
                 self._apply_translation(info, trans)
         else:
             paragraph_segments = defaultdict(list)
+            # [FIX] 按顶级段落对所有片段进行分组，以确保形状等嵌套内容与主段落一起处理
             for i, info in enumerate(elements):
-                paragraph = info["paragraph"]
-                para_id = id(paragraph._p)
-                paragraph_segments[para_id].append({"index": i, "translation": translated[i]})
+                top_level_paragraph = info["top_level_paragraph"]
+                paragraph_segments[id(top_level_paragraph._p)].append({
+                    "index": i,
+                    "translation": translated[i],
+                    "paragraph_obj": top_level_paragraph
+                })
 
-            processed_paragraphs = set()
-            for info in elements:
-                paragraph = info["paragraph"]
-                p_element = paragraph._p
-                para_id = id(p_element)
+            for para_id, segments_for_this_para in paragraph_segments.items():
+                # 从该组的第一个片段中获取唯一的顶级段落对象
+                top_level_paragraph_orig = segments_for_this_para[0]["paragraph_obj"]
+                p_element_orig = top_level_paragraph_orig._p
 
-                if para_id in processed_paragraphs:
-                    continue
-                processed_paragraphs.add(para_id)
+                # 创建顶级段落的深拷贝，所有翻译将应用于此副本
+                translated_p_element = deepcopy(p_element_orig)
+                self._prune_unwanted_elements_from_copy(translated_p_element)
+                top_level_paragraph_copy = Paragraph(translated_p_element, top_level_paragraph_orig._parent)
 
-                translated_p_element = deepcopy(p_element)
-                translated_paragraph_obj = Paragraph(translated_p_element, paragraph._parent)
-                segments_for_this_para = paragraph_segments[para_id]
+                # [FIX] 创建从原始元素到复制元素的映射，包括嵌套的段落和所有runs
+                # 1. 嵌套段落映射
+                para_map = {id(p_element_orig): top_level_paragraph_copy}
+                orig_nested_ps = p_element_orig.iter(qn('w:p'))
+                copy_nested_ps = translated_p_element.iter(qn('w:p'))
+                for o, c in zip(orig_nested_ps, copy_nested_ps):
+                    para_map[id(o)] = Paragraph(c, top_level_paragraph_copy)
+
+                # 2. Run元素映射
+                run_element_map = {
+                    id(orig_r): copied_r
+                    for orig_r, copied_r in zip(p_element_orig.iter(qn('w:r')), translated_p_element.iter(qn('w:r')))
+                }
 
                 for seg_info in segments_for_this_para:
                     element_index = seg_info["index"]
                     translation = seg_info["translation"]
                     original_element_info = elements[element_index]
+
+                    # [FIX] 从映射中查找当前片段对应的、位于副本中的父段落对象
+                    original_para_id = id(original_element_info["paragraph"]._p)
+                    translated_paragraph_obj = para_map.get(original_para_id)
+
+                    if not translated_paragraph_obj:
+                        self.logger.warning(
+                            f"无法在段落副本中找到对应的嵌套段落，跳过翻译应用: '{translation}'")
+                        continue
+
+                    # [FIX] 查找位于副本中的Run对象
+                    runs_from_copy = []
+                    for r in original_element_info["runs"]:
+                        copied_r_element = run_element_map.get(id(r.element))
+                        if copied_r_element is not None:
+                            # 使用正确的、位于副本中的父段落对象来创建Run
+                            new_run = Run(copied_r_element, translated_paragraph_obj)
+                            runs_from_copy.append(new_run)
+
+                    if not runs_from_copy:
+                        # self.logger.warning("在副本段落中找不到对应的Runs，跳过翻译应用。")
+                        continue
+
                     translated_element_info = {
                         "type": "text_runs",
-                        "runs": [Run(r.element, translated_paragraph_obj) for r in original_element_info["runs"]],
+                        "runs": runs_from_copy,
                         "paragraph": translated_paragraph_obj
                     }
                     self._apply_translation(translated_element_info, translation)
 
-                # --- 修改逻辑：创建并插入支持 \n 换行的分隔符段落 ---
+                # --- 分隔符和插入逻辑 (保持不变) ---
                 separator_p_element = None
                 if self.separator:
                     separator_p_element = OxmlElement('w:p')
-                    # 我们将所有文本和换行符都放在一个 run 中，以保持简单
                     run_element = OxmlElement('w:r')
-
                     lines = self.separator.split('\n')
                     for i, line in enumerate(lines):
-                        # 添加当前行的文本
                         text_element = OxmlElement('w:t')
-                        # xml:space="preserve" 确保前后的空格被保留
                         text_element.set(qn('xml:space'), 'preserve')
                         text_element.text = line
                         run_element.append(text_element)
-
-                        # 如果不是最后一行，则添加一个换行符 <w:br/>
                         if i < len(lines) - 1:
-                            br_element = OxmlElement('w:br')
-                            run_element.append(br_element)
-
+                            run_element.append(OxmlElement('w:br'))
                     separator_p_element.append(run_element)
-                # --- 修改逻辑结束 ---
 
-                # 将译文段落和（如果存在）分隔符段落插入文档
                 if self.insert_mode == "append":
-                    # 插入顺序：原文 -> 分隔符 -> 译文
-                    current_element = p_element
+                    current_element = p_element_orig
                     if separator_p_element is not None:
                         current_element.addnext(separator_p_element)
                         current_element = separator_p_element
                     current_element.addnext(translated_p_element)
                 elif self.insert_mode == "prepend":
-                    # 插入顺序：译文 -> 分隔符 -> 原文
-                    p_element.addprevious(translated_p_element)
+                    p_element_orig.addprevious(translated_p_element)
                     if separator_p_element is not None:
-                        # addnext 可以在刚插入的译文元素上调用，效果是在它后面、原文前面插入
                         translated_p_element.addnext(separator_p_element)
 
         doc_output_stream = BytesIO()
         doc.save(doc_output_stream)
         return doc_output_stream.getvalue()
-
-    # ---------------------- 修改结束 ----------------------
 
     def translate(self, document: Document) -> Self:
         doc, elements, originals = self._pre_translate(document)
