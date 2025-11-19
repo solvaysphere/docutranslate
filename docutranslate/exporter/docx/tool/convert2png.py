@@ -67,7 +67,7 @@ def convert_wmf_emf_to_png(image) -> str:
             tool_path = os.path.join(current_dir, "EmfToPngTool.exe")
         cmd = [tool_path, str(tmp_file_path)]
 
-        cmd += ['-crop', '-fastcrop']
+        cmd += ['-crop', '-fastcrop', '-transparent']
         cmd += ['-o', str(tmp_png_path)]
 
         # 5. 执行转换

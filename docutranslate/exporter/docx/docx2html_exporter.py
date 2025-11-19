@@ -5,12 +5,14 @@ import hashlib
 import os
 from dataclasses import dataclass
 from io import BytesIO
+
+import httpx
 import mammoth
 from docutranslate.exporter.base import ExporterConfig
 from docutranslate.exporter.docx.base import DocxExporter
 from docutranslate.ir.document import Document
 from docutranslate.exporter.docx.tool.convert2png import convert_wmf_emf_to_png, convert_wmf_emf_to_png_async
-from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
+from concurrent.futures import ThreadPoolExecutor
 
 @dataclass
 class Docx2HTMLExporterConfig(ExporterConfig):
@@ -110,3 +112,28 @@ class Docx2HTMLExporter(DocxExporter):
         ).value
 
         return Document.from_bytes(content=html_content.encode("utf-8"), suffix=".html", stem=document.stem)
+
+    def export_with_fish(self, document: Document) -> Document:
+        # 调用第三方接口 word 转 html
+        try:
+            url = "http://135.135.2.92:8081/convert_word_html"
+            json_data = {
+                "src_base64": base64.b64encode(document.content).decode('utf-8'),
+                "ext": document.suffix.lstrip('.')
+            }
+            response = httpx.post(url, json=json_data)
+            if response.status_code != 200:
+                raise Exception(f"响应内容:{response.text[:200]}")
+            if response.json()["state"] != "1":
+                raise Exception(f"响应内容:{response.json()['state_desc']}")
+            return Document.from_bytes(content=base64.b64decode(response.json()["target_base64"]), suffix=".html",
+                                       stem=document.stem)
+        except httpx.HTTPStatusError as e:
+            raise Exception(
+                f"HTTP 错误 (httpx): {e.response.status_code} - {e.request.url}\n响应内容: {e.response.text[:200]}...")
+        except httpx.RequestError as e:
+            raise Exception(f"下载ZIP文件时发生错误 (httpx): {e}")
+        except Exception as e:
+            import traceback
+            traceback.print_exc()  # 打印完整的堆栈跟踪，便于调试
+            raise Exception(f"发生未知错误: {e}")

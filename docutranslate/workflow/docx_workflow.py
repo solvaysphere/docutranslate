@@ -77,6 +77,18 @@ class DocxWorkflow(Workflow[DocxWorkflowConfig, Document, Document], HTMLExporta
         self.logger.info(f"导出Html完成，用时 {duration:.2f} 秒。")
         return docu.content.decode()
 
+    def export_to_html_with_fish(self, config: Docx2HTMLExporterConfig = None) -> str:
+        config = config or self.config.html_exporter_config
+        start_time = time.time()
+        if self.document_translated is None:
+            raise RuntimeError("Document has not been translated yet. Call translate() first.")
+        exporter = Docx2HTMLExporter(config)
+        docu = exporter.export_with_fish(self.document_translated)
+        end_time = time.time()
+        duration = end_time - start_time
+        self.logger.info(f"导出Html完成，用时 {duration:.2f} 秒。")
+        return docu.content.decode()
+
     def export_to_docx(self, _: ExporterConfig | None = None) -> bytes:
         docu = self._export(Docx2DocxExporter())
         return docu.content
@@ -111,3 +123,5 @@ class DocxWorkflow(Workflow[DocxWorkflowConfig, Document, Document], HTMLExporta
         duration = end_time - start_time
         self.logger.info(f"多线程转换Html完成，用时 {duration:.2f} 秒。")
         return docu.content.decode()
+
+
