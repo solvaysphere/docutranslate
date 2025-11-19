@@ -23,7 +23,8 @@ for package in ['easyocr', 'docling', 'pygments']:
 custom_datas = [
     ('./.venv/Lib/site-packages/docling_parse/pdf_resources_v2', 'docling_parse/pdf_resources_v2'),
     ('./docutranslate/static', 'docutranslate/static'),
-    ('./docutranslate/template', 'docutranslate/template')
+    ('./docutranslate/template', 'docutranslate/template'),
+    ('./tools', 'tools')
 ]
 
 # 避免添加重复的数据

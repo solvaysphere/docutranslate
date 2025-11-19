@@ -4,7 +4,8 @@ import docutranslate
 
 datas = [
     ('./docutranslate/static', 'docutranslate/static'),
-    ('./docutranslate/template', 'docutranslate/template')
+    ('./docutranslate/template', 'docutranslate/template'),
+    ('./tools', 'tools')
 ]
 
 # 只收集 pygments 的数据文件

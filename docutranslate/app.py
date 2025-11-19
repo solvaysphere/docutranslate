@@ -1283,7 +1283,7 @@ async def _perform_translation(
         is_cdn_available = True
         try:
             await httpx_client.head(
-                "https://s4.zstatic.net/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js",
+                "http://127.0.0.1:8082/static/katex/auto-render.min.js",
                 timeout=3,
             )
         except (httpx.TimeoutException, httpx.RequestError):
@@ -1312,11 +1312,18 @@ async def _perform_translation(
                 html_config = Epub2HTMLExporterConfig(cdn=is_cdn_available)
             elif isinstance(workflow, AssWorkflow):
                 html_config = Ass2HTMLExporterConfig(cdn=is_cdn_available)
-            export_map["html"] = (
-                lambda: workflow.export_to_html(html_config),
-                f"{filename_stem}_translated.html",
-                True,
-            )
+            if not isinstance(workflow, DocxWorkflow):
+                export_map["html"] = (
+                    lambda: workflow.export_to_html(html_config),
+                    f"{filename_stem}_translated.html",
+                    True,
+                )
+            else:
+                export_map["html"] = (
+                    lambda: workflow.export_to_html_with_fish(html_config),
+                    f"{filename_stem}_translated.html",
+                    True,
+                )
         if isinstance(workflow, MDFormatsExportable):
             export_map["markdown"] = (
                 workflow.export_to_markdown,
