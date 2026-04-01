@@ -103,8 +103,5 @@ def convert_wmf_emf_to_png(image) -> str:
         except:
             pass
 
-
-
 if __name__ == '__main__':
-    print(getRootPath())
-    print(resource_path('lib'))
+    print(get_bundle_root())
