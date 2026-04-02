@@ -120,3 +120,19 @@ class PPTXExportable(Protocol[T_ExporterConfig]):
 
     def save_as_pptx(self, name: str, output_dir: Path | str, config: T_ExporterConfig | None = None) -> Self:
         ...
+
+@runtime_checkable
+class LanternExportable(Protocol[T_ExporterConfig]):
+    def export_to_docx(self, config: T_ExporterConfig | None = None) -> bytes:
+        ...
+
+    def save_as_docx(self, name: str, output_dir: Path | str, config: T_ExporterConfig | None = None) -> Self:
+        ...
+
+@runtime_checkable
+class LanternHtmlExportable(Protocol[T_ExporterConfig]):
+    def export_to_html(self, config: T_ExporterConfig | None = None) -> bytes:
+        ...
+
+    def save_as_html(self, name: str, output_dir: Path | str, config: T_ExporterConfig | None = None) -> Self:
+        ...

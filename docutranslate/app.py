@@ -1020,6 +1020,134 @@ async def service_flat_translate(
         "attachments": attachments
     })
 
+# ===================================================================
+# --- Lanetern function ---
+# ===================================================================
+
+# word的(Base64格式)转html
+@service_router.post(
+    "/word2html",
+    summary="将Word(Base64格式)文档转换为HTML",
+    description="""
+将Word(Base64格式)文档转换为HTML。
+
+- **返回结构**: 返回一个JSON对象，包含文件名、文件内容的Base64编码字符串。
+- **内容编码**: 文件内容总是以 **Base64** 编码，客户端需要自行解码才能使用。
+""",
+    responses={
+        200: {
+            "description": "成功返回HTML内容。",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "html_base64": {
+                            "summary": "HTML 内容 (Base64)",
+                            "value": {
+                                "filename": "my_doc_translated.html",
+                                "content": "PGh0bWw+PGhlYWQ+...",
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        400: {"description": "请求体无效，例如Base64解码失败。"},
+        500: {"description": "启动后台任务时发生未知错误。"},
+    }
+)
+async def service_word2html(
+        request: TranslateServiceRequest = Body(
+            ..., description="翻译任务的详细参数和文件内容。"
+        )
+):
+    task_id = uuid.uuid4().hex[:8]
+    import re
+    # 通过正则去掉Base64标记
+    if request.file_content:
+        request.file_content = re.sub(r"^data:application/[^;]+;base64,", "", request.file_content)
+        try:
+            file_contents = base64.b64decode(request.file_content)
+        except binascii.Error as e:
+            raise HTTPException(status_code=400, detail=f"无效的Base64文件内容: {e}")
+    else:
+        raise HTTPException(status_code=400, detail=f"无效的Base64文件内容")
+    try:
+        response_data = await translation_service.start_word2html(
+            task_id=task_id,
+            payload=request.payload,
+            file_contents=file_contents,
+            original_filename=request.file_name,
+        )
+        return JSONResponse(content=response_data)
+    except HTTPException as e:
+        if e.status_code == 500:
+            return JSONResponse(
+                status_code=e.status_code,
+                content={"task_started": False, "message": e.detail},
+            )
+        raise e
+
+@service_router.post(
+    "/html2word",
+    summary="将HTML(Base64格式)文档转换为Word",
+    description="""
+将HTML(Base64格式)文档转换为Word。
+
+- **返回结构**: 响应包含一个JSON对象，包含文件名、文件内容的Base64编码字符串。
+- **内容编码**: 文件内容总是以 **Base64** 编码，客户端需要自行解码才能使用。
+""",
+    responses={
+        200: {
+            "description": "成功返回Word内容。",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "word_base64": {
+                            "summary": "Word 内容 (Base64)",
+                            "value": {
+                                "filename": "my_doc_translated.docx",
+                                "content": "UEsDBBQACAgIAD...",
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        400: {"description": "请求体无效，例如Base64解码失败。"},
+        500: {"description": "启动后台任务时发生未知错误。"},
+    }
+)
+async def service_html2word(
+        request: TranslateServiceRequest = Body(
+            ..., description="翻译任务的详细参数和文件内容。"
+        )
+):
+    task_id = uuid.uuid4().hex[:8]
+    import re
+    # 通过正则去掉Base64标记
+    if request.file_content:
+        request.file_content = re.sub(r"^data:text/[^;]+;base64,", "", request.file_content)
+        try:
+            file_contents = base64.b64decode(request.file_content)
+        except binascii.Error as e:
+            raise HTTPException(status_code=400, detail=f"无效的Base64文件内容: {e}")
+    else:
+        raise HTTPException(status_code=400, detail=f"无效的Base64文件内容")
+    try:
+        response_data = await translation_service.start_html2word(
+            task_id=task_id,
+            payload=request.payload,
+            file_contents=file_contents,
+            original_filename=request.file_name,
+        )
+        return JSONResponse(content=response_data)
+    except HTTPException as e:
+        if e.status_code == 500:
+            return JSONResponse(
+                status_code=e.status_code,
+                content={"task_started": False, "message": e.detail},
+            )
+        raise e
 
 # ===================================================================
 # --- Static pages and docs ---

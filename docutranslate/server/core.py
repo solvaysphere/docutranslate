@@ -91,7 +91,10 @@ from docutranslate.exporter.ass.ass2html_exporter import Ass2HTMLExporterConfig
 from docutranslate.translator.ai_translator.pptx_translator import PPTXTranslatorConfig
 from docutranslate.exporter.pptx.pptx2html_exporter import PPTX2HTMLExporterConfig
 
-
+from docutranslate.workflow.lantern_workflow import LanternWorkflow, LanternWorkflowConfig
+from docutranslate.translator.ai_translator.lantern_translator import LanternTranslatorConfig
+from docutranslate.exporter.lantern.lantern2html_exporter import Lantern2HTMLExporterConfig
+from docutranslate.server.convert import ConvertService, get_convert_service
 MAX_LOG_HISTORY = 200
 
 
@@ -107,6 +110,7 @@ WORKFLOW_DICT: Dict[str, Type[Workflow]] = {
     "html": HtmlWorkflow,
     "ass": AssWorkflow,
     "pptx": PPTXWorkflow,
+    "lantern": LanternWorkflow,
 }
 
 
@@ -124,6 +128,7 @@ MEDIA_TYPES = {
     "epub": "application/epub+zip",
     "ass": "text/plain; charset=utf-8",
     "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "lantern": "application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/html; charset=utf-8",
 }
 
 
@@ -232,6 +237,9 @@ class TranslationService:
 
         # Reference to main event loop (set by application)
         self.main_event_loop: Optional[asyncio.AbstractEventLoop] = None
+
+        # --- Shared Convert Service ---
+        self.convert_service: ConvertService = get_convert_service()
 
     def initialize(self, httpx_client: httpx.AsyncClient, main_event_loop: asyncio.AbstractEventLoop):
         """Initialize the service with HTTP client and event loop."""
@@ -669,6 +677,7 @@ class TranslationService:
             HtmlWorkflowParams,
             AssWorkflowParams,
             PPTXWorkflowParams,
+            LanternWorkflowParams,
         )
 
         if isinstance(payload, MarkdownWorkflowParams):
@@ -1133,6 +1142,49 @@ class TranslationService:
             )
             return PPTXWorkflow(config=workflow_config)
 
+        elif isinstance(payload, LanternWorkflowParams):
+            task_logger.info("构建 LanternWorkflow 配置。")
+            translator_args = payload.model_dump(
+                include={
+                    "skip_translate",
+                    "base_url",
+                    "api_key",
+                    "model_id",
+                    "to_lang",
+                    "custom_prompt",
+                    "temperature",
+                    "top_p",
+                    "thinking",
+                    "chunk_size",
+                    "concurrent",
+                    "insert_mode",
+                    "separator",
+                    "glossary_dict",
+                    "timeout",
+                    "retry",
+                    "system_proxy_enable",
+                    "force_json",
+                    "rpm",
+                    "tpm",
+                    "provider",
+                    "extra_body",
+                },
+                exclude_none=True,
+            )
+            translator_args["glossary_generate_enable"] = payload.glossary_generate_enable
+            translator_args["glossary_agent_config"] = build_glossary_agent_config()
+            translator_config = LanternTranslatorConfig(**translator_args)
+            translator_config.progress_tracker = progress_tracker
+
+            html_exporter_config = Lantern2HTMLExporterConfig(cdn=True)
+            workflow_config = LanternWorkflowConfig(
+                translator_config=translator_config,
+                html_exporter_config=html_exporter_config,
+                logger=task_logger,
+                progress_tracker=progress_tracker,
+            )
+            return LanternWorkflow(config=workflow_config)
+
         else:
             raise TypeError(f"工作流类型 '{payload.workflow_type}' 的处理逻辑未实现。")
 
@@ -1345,6 +1397,85 @@ class TranslationService:
                 print(f"[TranslationService] 关闭HTTP客户端时出错: {e}")
             finally:
                 self.httpx_client = None
+
+    # word2html转换任务
+    async def start_word2html(
+        self,
+        task_id: str,
+        payload: TranslatePayload,
+        file_contents: bytes,
+        original_filename: str,
+    ):
+        task_logger = logging.getLogger(f"task.{task_id}")
+        task_logger.setLevel(logging.INFO)
+        task_logger.propagate = False
+        try:
+            if task_logger.hasHandlers():
+                task_logger.handlers.clear()
+
+            task_logger.info(
+                f"后台转换任务开始: 文件 '{original_filename}', 工作流: '{payload.workflow_type}'"
+            )
+            task_logger.info(f"正在处理 '{original_filename}'...")
+            start_time = time.time()
+            # 读取文件内容
+            file_stem = Path(original_filename).stem
+            file_suffix = Path(original_filename).suffix
+            document = self.convert_service.read_bytes(content=file_contents, stem=file_stem, suffix=file_suffix)
+            content = self.convert_service.convert_to_html_async(document)
+            content_bytes = content.encode("utf-8")
+
+            end_time = time.time()
+            duration = end_time - start_time
+            task_logger.info(f"转换成功完成，用时 {duration:.2f} 秒。")
+
+            return {
+                "task_id": task_id,
+                "filename": f"{file_stem}.html",
+                "content": base64.b64encode(content_bytes).decode("utf-8"),
+            }
+        except Exception as e:
+            task_logger.error(f"转换失败: {e}")
+            raise HTTPException(status_code=500, detail=f"启动转换任务时出错: {mask_secrets(str(e))}")
+
+    # html2word转换任务
+    async def start_html2word(
+        self,
+        task_id: str,
+        payload: TranslatePayload,
+        file_contents: bytes,
+        original_filename: str
+    ):
+        task_logger = logging.getLogger(f"task.{task_id}")
+        task_logger.setLevel(logging.INFO)
+        task_logger.propagate = False
+        try:
+            if task_logger.hasHandlers():
+                task_logger.handlers.clear()
+
+            task_logger.info(
+                f"后台转换任务开始: 文件 '{original_filename}', 工作流: '{payload.workflow_type}'"
+            )
+            task_logger.info(f"正在处理 '{original_filename}'...")
+            start_time = time.time()
+
+            # 读取文件
+            file_stem = Path(original_filename).stem
+            file_suffix = Path(original_filename).suffix
+            document = self.convert_service.read_bytes(content=file_contents, stem=file_stem, suffix=file_suffix)
+            content_bytes = self.convert_service.convert_to_word(document)
+            end_time = time.time()
+            duration = end_time - start_time
+            task_logger.info(f"转换成功完成，用时 {duration:.2f} 秒。")
+
+            return {
+                "task_id": task_id,
+                "filename": f"{file_stem}.docx",
+                "content": base64.b64encode(content_bytes).decode("utf-8"),
+            }
+        except Exception as e:
+            task_logger.error(f"转换任务失败: {e}")
+            raise HTTPException(status_code=500, detail=f"启动转换任务时出错: {mask_secrets(str(e))}")
 
 
 # Global singleton instance

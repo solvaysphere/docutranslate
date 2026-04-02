@@ -28,7 +28,7 @@ from docutranslate.translator import default_params
 # --- 公共类型定义 ---
 WorkflowType = Literal[
     "auto", "markdown_based", "txt", "json", "xlsx", "docx",
-    "srt", "epub", "html", "ass", "pptx"
+    "srt", "epub", "html", "ass", "pptx", "lantern"
 ]
 InsertMode = Literal["replace", "append", "prepend"]
 
@@ -500,6 +500,23 @@ class PPTXWorkflowParams(BaseWorkflowParams):
 
 # --- PPTX WORKFLOW PARAMS END ---
 
+# --- Lantern WORKFLOW PARAMS START ---
+class LanternWorkflowParams(BaseWorkflowParams):
+    workflow_type: Literal["lantern"] = Field(
+        ..., description="指定使用Lantern的翻译工作流。"
+    )
+    insert_mode: Literal["replace", "append", "prepend"] = Field(
+        "replace",
+        description="翻译文本的插入模式。'replace'：替换原文，'append'：附加到原文后，'prepend'：附加到原文前。",
+    )
+    separator: str = Field(
+        "\n",
+        description="当 insert_mode 为 'append' 或 'prepend' 时，用于分隔原文和译文的分隔符。",
+    )
+
+# --- Lantern WORKFLOW PARAMS END ---
+
+
 
 TranslatePayload = Annotated[
     Union[
@@ -514,6 +531,7 @@ TranslatePayload = Annotated[
         HtmlWorkflowParams,
         AssWorkflowParams,
         PPTXWorkflowParams,
+        LanternWorkflowParams,
     ],
     Field(discriminator="workflow_type"),
 ]
