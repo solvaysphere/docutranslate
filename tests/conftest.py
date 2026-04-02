@@ -16,7 +16,7 @@ sys.path.insert(0, str(project_root))
 
 @pytest.fixture(scope="session")
 def test_data_dir() -> Path:
-    """Fixture for test data directory"""
+    """Fixture for test_abc data directory"""
     data_dir = project_root / "tests" / "test_data"
     data_dir.mkdir(exist_ok=True)
     return data_dir
@@ -24,7 +24,7 @@ def test_data_dir() -> Path:
 
 @pytest.fixture
 def temp_dir() -> Path:
-    """Fixture for temporary directory that gets cleaned up after test"""
+    """Fixture for temporary directory that gets cleaned up after test_abc"""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
 
@@ -33,11 +33,11 @@ def temp_dir() -> Path:
 def mock_env_vars(monkeypatch) -> None:
     """Fixture to set up mock environment variables for testing"""
     monkeypatch.setenv("DOCUTRANSLATE_BASE_URL", "https://api.openai.com/v1")
-    monkeypatch.setenv("DOCUTRANSLATE_API_KEY", "test-api-key")
+    monkeypatch.setenv("DOCUTRANSLATE_API_KEY", "test_abc-api-key")
     monkeypatch.setenv("DOCUTRANSLATE_MODEL_ID", "gpt-4o")
     monkeypatch.setenv("DOCUTRANSLATE_TO_LANG", "中文")
     monkeypatch.setenv("DOCUTRANSLATE_CONCURRENT", "10")
-    monkeypatch.setenv("DOCUTRANSLATE_MINERU_TOKEN", "test-mineru-token")
+    monkeypatch.setenv("DOCUTRANSLATE_MINERU_TOKEN", "test_abc-mineru-token")
     monkeypatch.delenv("DOCUTRANSLATE_PROXY_ENABLED", raising=False)
 
 
@@ -45,7 +45,7 @@ def mock_env_vars(monkeypatch) -> None:
 def mock_llm_response() -> Dict[str, Any]:
     """Fixture for mock LLM API response"""
     return {
-        "id": "test-response-id",
+        "id": "test_abc-response-id",
         "object": "chat.completion",
         "created": 1234567890,
         "model": "gpt-4o",

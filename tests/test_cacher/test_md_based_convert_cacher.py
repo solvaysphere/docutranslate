@@ -22,7 +22,7 @@ def test_get_hashcode():
     # Mock dependencies
     mock_document = MagicMock()
     mock_document.suffix = ".pdf"
-    mock_document.content = b"test content"
+    mock_document.content = b"test_abc content"
 
     mock_config = MagicMock()
     mock_config.gethash.return_value = "config-hash"
@@ -52,7 +52,7 @@ def test_cache_and_get_result():
     # Mock dependencies
     mock_document = MagicMock()
     mock_document.suffix = ".pdf"
-    mock_document.content = b"test content"
+    mock_document.content = b"test_abc content"
 
     mock_config = MagicMock()
     mock_config.gethash.return_value = "config-hash"
@@ -119,7 +119,7 @@ def test_clear_cache():
     # Add some items
     mock_doc = MagicMock()
     mock_doc.suffix = ".pdf"
-    mock_doc.content = b"test"
+    mock_doc.content = b"test_abc"
     mock_config = MagicMock()
     mock_config.gethash.return_value = "hash"
     mock_md = MagicMock()

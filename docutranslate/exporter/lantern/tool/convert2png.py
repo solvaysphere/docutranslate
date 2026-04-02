@@ -17,7 +17,7 @@ def find_development_root():
         if any(os.path.exists(os.path.join(current, m)) for m in markers):
             return current
         current = os.path.dirname(current)
-    return os.path.abspath(".")  # fallback
+    return os.path.abspath("")  # fallback
 
 def get_bundle_root():
     """返回当前环境下的资源根路径"""

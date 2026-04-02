@@ -17,39 +17,39 @@ from docutranslate.ir.attachment_manager import (
 # ==================== Document tests ====================
 def test_document_initialization():
     """Test Document initialization"""
-    content = b"test content"
-    doc = Document(suffix=".txt", content=content, stem="test", path=None)
+    content = b"test_abc content"
+    doc = Document(suffix=".txt", content=content, stem="test_abc", path=None)
     assert doc.suffix == ".txt"
     assert doc.content == content
-    assert doc._stem == "test"
+    assert doc._stem == "test_abc"
     assert doc.path is None
 
 
 def test_document_stem_property():
     """Test Document stem property"""
     # With stem
-    doc = Document(suffix=".txt", content=b"test", stem="mydoc")
+    doc = Document(suffix=".txt", content=b"test_abc", stem="mydoc")
     assert doc.stem == "mydoc"
 
     # Without stem
-    doc = Document(suffix=".txt", content=b"test")
+    doc = Document(suffix=".txt", content=b"test_abc")
     assert doc.stem is None
 
 
 def test_document_name_property():
     """Test Document name property"""
     # With stem
-    doc = Document(suffix=".txt", content=b"test", stem="mydoc")
+    doc = Document(suffix=".txt", content=b"test_abc", stem="mydoc")
     assert doc.name == "mydoc.txt"
 
     # Without stem
-    doc = Document(suffix=".txt", content=b"test")
+    doc = Document(suffix=".txt", content=b"test_abc")
     assert doc.name is None
 
 
 def test_document_from_bytes():
     """Test Document.from_bytes classmethod"""
-    content = b"test from bytes"
+    content = b"test_abc from bytes"
     doc = Document.from_bytes(content=content, suffix=".md", stem="testdoc")
     assert doc.content == content
     assert doc.suffix == ".md"
@@ -58,9 +58,9 @@ def test_document_from_bytes():
 
 def test_document_from_path(temp_dir):
     """Test Document.from_path classmethod"""
-    # Create a test file
+    # Create a test_abc file
     test_file = temp_dir / "testfile.txt"
-    test_content = b"test file content"
+    test_content = b"test_abc file content"
     test_file.write_bytes(test_content)
 
     # Read with from_path
@@ -78,7 +78,7 @@ def test_document_from_path(temp_dir):
 
 def test_document_copy():
     """Test Document.copy method"""
-    doc1 = Document(suffix=".txt", content=b"original", stem="test")
+    doc1 = Document(suffix=".txt", content=b"original", stem="test_abc")
     doc2 = doc1.copy()
 
     # Should be different objects
@@ -93,7 +93,7 @@ def test_document_copy():
 def test_markdown_document_initialization():
     """Test MarkdownDocument initialization"""
     content = b"# Test markdown"
-    doc = MarkdownDocument(content=content, suffix=".md", stem="test")
+    doc = MarkdownDocument(content=content, suffix=".md", stem="test_abc")
     assert isinstance(doc, MarkdownDocument)
     assert isinstance(doc, Document)
     assert doc.content == content
@@ -102,7 +102,7 @@ def test_markdown_document_initialization():
 
 def test_markdown_document_copy():
     """Test MarkdownDocument.copy method"""
-    doc1 = MarkdownDocument(content=b"# Test", suffix=".md", stem="test")
+    doc1 = MarkdownDocument(content=b"# Test", suffix=".md", stem="test_abc")
     doc2 = doc1.copy()
 
     assert doc1 is not doc2
@@ -113,7 +113,7 @@ def test_markdown_document_copy():
 # ==================== Attachment tests ====================
 def test_attachment_initialization():
     """Test AttachMent initialization"""
-    mock_doc = Document(suffix=".csv", content=b"test", stem="glossary")
+    mock_doc = Document(suffix=".csv", content=b"test_abc", stem="glossary")
     attachment = AttachMent(identifier="glossary", document=mock_doc)
     assert attachment.identifier == "glossary"
     assert attachment.document == mock_doc
@@ -121,7 +121,7 @@ def test_attachment_initialization():
 
 def test_attachment_repr():
     """Test AttachMent __repr__ method"""
-    mock_doc = Document(suffix=".csv", content=b"test", stem="glossary")
+    mock_doc = Document(suffix=".csv", content=b"test_abc", stem="glossary")
     attachment = AttachMent(identifier="glossary", document=mock_doc)
     assert repr(attachment) == "glossary.csv"
 
@@ -135,7 +135,7 @@ def test_attachment_manager_initialization():
 def test_attachment_manager_add_document():
     """Test AttachMentManager.add_document method"""
     manager = AttachMentManager()
-    mock_doc = Document(suffix=".csv", content=b"test", stem="glossary")
+    mock_doc = Document(suffix=".csv", content=b"test_abc", stem="glossary")
     manager.add_document("glossary", mock_doc)
     assert "glossary" in manager.attachment_dict
     assert manager.attachment_dict["glossary"] == mock_doc
@@ -144,7 +144,7 @@ def test_attachment_manager_add_document():
 def test_attachment_manager_add_attachment():
     """Test AttachMentManager.add_attachment method"""
     manager = AttachMentManager()
-    mock_doc = Document(suffix=".csv", content=b"test", stem="glossary")
+    mock_doc = Document(suffix=".csv", content=b"test_abc", stem="glossary")
     attachment = AttachMent(identifier="glossary", document=mock_doc)
     manager.add_attachment(attachment)
     assert "glossary" in manager.attachment_dict

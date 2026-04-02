@@ -47,8 +47,7 @@ except Exception as e:
 custom_datas = [
     ('./.venv/Lib/site-packages/docling_parse/pdf_resources', 'docling_parse/pdf_resources'),
     ('./docutranslate/static', 'docutranslate/static'),
-    ('./docutranslate/template', 'docutranslate/template'),
-    ('./tools', 'tools')
+    ('./docutranslate/template', 'docutranslate/template')
 ]
 
 # 避免添加重复的数据

@@ -38,9 +38,9 @@ def test_glossary_update():
     assert glossary.glossary_dict == {"hello": "你好", "world": "世界"}
 
     # Update with stripped whitespace
-    glossary.update({"  test  ": "测试"})
-    assert "test" in glossary.glossary_dict
-    assert glossary.glossary_dict["test"] == "测试"
+    glossary.update({"  test_abc  ": "测试"})
+    assert "test_abc" in glossary.glossary_dict
+    assert glossary.glossary_dict["test_abc"] == "测试"
 
 
 def test_append_system_prompt():
@@ -59,7 +59,7 @@ def test_append_system_prompt():
     assert "world=>世界" in prompt
 
     # Text with no matching terms
-    prompt = glossary.append_system_prompt("This is a test")
+    prompt = glossary.append_system_prompt("This is a test_abc")
     assert prompt == ""
 
 

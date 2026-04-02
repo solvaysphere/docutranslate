@@ -1,12 +1,10 @@
 # SPDX-FileCopyrightText: 2025 QinHan
 # SPDX-License-Identifier: MPL-2.0
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
 from docutranslate.exporter.base import ExporterConfig
-from docutranslate.exporter.html.html2docx_exporter import Html2DocxExporter
 from docutranslate.exporter.html.html2html_exporter import Html2HtmlExporter
 from docutranslate.glossary.glossary import Glossary
 
@@ -80,12 +78,3 @@ class HtmlWorkflow(Workflow[HtmlWorkflowConfig, Document, Document], HTMLExporta
                      _: ExporterConfig | None = None) -> Self:
         self._save(exporter=Html2HtmlExporter(), name=name, output_dir=output_dir)
         return self
-
-    def convert_to_word(self, _: ExporterConfig = None):
-        exporter = Html2DocxExporter()
-        start_time = time.time()
-        docu = exporter.export(self.document_original)
-        end_time = time.time()
-        duration = end_time - start_time
-        self.logger.info(f"转换Word完成，用时 {duration:.2f} 秒。")
-        return docu.content

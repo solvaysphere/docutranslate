@@ -638,6 +638,10 @@ class Agent:
         current_partial_result = None
         input_tokens = 0
         output_tokens = 0
+
+        # 发送请求日志
+        self.logger.info(f"API发送请求: {data}")
+
         try:
             response = await client.post(
                 f"{self.baseurl}/chat/completions",
