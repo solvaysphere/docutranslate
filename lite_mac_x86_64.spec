@@ -5,6 +5,7 @@ import docutranslate
 datas = [
     ('./docutranslate/static', 'docutranslate/static'),
     ('./docutranslate/template', 'docutranslate/template'),
+    ('./tools', 'tools'),
     *collect_data_files('pygments'),
 ]
 

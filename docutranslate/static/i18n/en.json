@@ -13,6 +13,7 @@
   "workflowOptionJson": "JSON Translation (.json)",
   "workflowOptionHtml": "HTML Translation (.html)",
   "workflowOptionPptx": "PPTX Presentation (.pptx)",
+  "workflowOptionLantern": "Lantern Translation (.docx)",
   "autoWorkflowLabel": "Auto-select Workflow",
   "txtSettingsTitleText": "TXT Translation Options",
   "insertModeLabel": "Insert Mode",

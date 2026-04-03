@@ -18,7 +18,7 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from docx.table import _Cell, Table
 
-from docutranslate.agents.segments_agent import SegmentsTranslateAgentConfig, SegmentsTranslateAgent
+from docutranslate.agents.lantern_agent import LanternTranslateAgentConfig, LanternTranslateAgent
 from docutranslate.ir.document import Document
 from docutranslate.translator.ai_translator.base import AiTranslatorConfig, AiTranslator
 
@@ -75,7 +75,6 @@ class LanternTranslatorConfig(AiTranslatorConfig):
     insert_mode: Literal["replace", "append", "prepend"] = "replace"
     separator: str = "\n"
 
-
 # ---------------- 主类 ----------------
 class LanternTranslator(AiTranslator):
     """
@@ -97,7 +96,7 @@ class LanternTranslator(AiTranslator):
         self.translate_agent = None
         glossary_dict = self.glossary.glossary_dict if self.glossary else None
         if not self.skip_translate:
-            agent_config = SegmentsTranslateAgentConfig(
+            agent_config = LanternTranslateAgentConfig(
                 custom_prompt=config.custom_prompt, to_lang=config.to_lang, base_url=config.base_url,
                 api_key=config.api_key, model_id=config.model_id, temperature=config.temperature,
                 top_p=config.top_p,
@@ -109,7 +108,7 @@ class LanternTranslator(AiTranslator):
                 provider=config.provider,
                 extra_body=config.extra_body,
             )
-            self.translate_agent = SegmentsTranslateAgent(agent_config)
+            self.translate_agent = LanternTranslateAgent(agent_config)
         self.insert_mode = config.insert_mode
         self.separator = config.separator
 

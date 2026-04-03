@@ -24,6 +24,7 @@ dependencies = [
     "charset-normalizer>=3.4.4",
     "html2text>=2024.2.26",
     "python-dotenv>=1.2.1",
+    "pypandoc>=1.17",
 ]
 dynamic = ["version"]
 
@@ -60,6 +61,14 @@ docutranslate = ["static/**", "template/**"]
 
 [tool.setuptools.dynamic]
 version = { attr = "docutranslate.__version__" }
+
+
+[[tool.uv.index]]
+url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"
+default = true
+
+[tool.uv.pip]
+index-url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

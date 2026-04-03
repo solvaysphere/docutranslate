@@ -5,7 +5,9 @@ import hashlib
 import os
 from dataclasses import dataclass
 from io import BytesIO
+from typing import Literal
 
+import httpx
 import mammoth
 
 from docutranslate.exporter.base import ExporterConfig
@@ -19,6 +21,7 @@ from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
 @dataclass
 class Lantern2HTMLExporterConfig(ExporterConfig):
     cdn: bool = True
+    export_html_mode: Literal["fish", "default"] = "default"
 
 
 class Lantern2HTMLExporter(LanternExporter):
@@ -26,8 +29,10 @@ class Lantern2HTMLExporter(LanternExporter):
         config = config or Lantern2HTMLExporterConfig()
         super().__init__(config=config)
         self.cdn = config.cdn
+        self.export_html_mode = config.export_html_mode
 
     def export(self, document: Document) -> Document:
+
         def convert_single_image(image):
             """单个图片转换函数，用于多进程处理"""
             content_type = image.content_type
@@ -46,12 +51,15 @@ class Lantern2HTMLExporter(LanternExporter):
                 "src": "data:{0};base64,{1}".format(content_type, encoded_src)
             }
 
-        html_content = mammoth.convert_to_html(
-            BytesIO(document.content),
-            convert_image=mammoth.images.img_element(convert_image)
-        ).value
+        if self.export_html_mode == "fish":
+            return self.export_with_fish(document)
+        else:
+            html_content = mammoth.convert_to_html(
+                BytesIO(document.content),
+                convert_image=mammoth.images.img_element(convert_image)
+            ).value
 
-        return Document.from_bytes(content=html_content.encode("utf-8"), suffix=".html", stem=document.stem)
+            return Document.from_bytes(content=html_content.encode("utf-8"), suffix=".html", stem=document.stem)
 
     def export_async(self, document: Document) -> Document:
         # 收集所有需要转换的图片
@@ -115,3 +123,28 @@ class Lantern2HTMLExporter(LanternExporter):
         ).value
 
         return Document.from_bytes(content=html_content.encode("utf-8"), suffix=".html", stem=document.stem)
+
+    def export_with_fish(self, document: Document) -> Document:
+        # 调用第三方接口 word 转 html
+        try:
+            url = "http://135.135.2.92:8081/convert_word_html"
+            json_data = {
+                "src_base64": base64.b64encode(document.content).decode('utf-8'),
+                "ext": document.suffix.lstrip('.')
+            }
+            response = httpx.post(url, json=json_data)
+            if response.status_code != 200:
+                raise Exception(f"响应内容:{response.text[:200]}")
+            if response.json()["state"] != "1":
+                raise Exception(f"响应内容:{response.json()['state_desc']}")
+            return Document.from_bytes(content=base64.b64decode(response.json()["target_base64"]), suffix=".html",
+                                       stem=document.stem)
+        except httpx.HTTPStatusError as e:
+            raise Exception(
+                f"HTTP 错误 (httpx): {e.response.status_code} - {e.request.url}\n响应内容: {e.response.text[:200]}...")
+        except httpx.RequestError as e:
+            raise Exception(f"下载ZIP文件时发生错误 (httpx): {e}")
+        except Exception as e:
+            import traceback
+            traceback.print_exc()  # 打印完整的堆栈跟踪，便于调试
+            raise Exception(f"发生未知错误: {e}")

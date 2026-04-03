@@ -5,22 +5,22 @@ from pathlib import Path
 from typing import Self
 
 from docutranslate.exporter.base import ExporterConfig
+from docutranslate.exporter.html.html2docx_exporter import Html2DocxExporterConfig, Html2DocxExporter
 from docutranslate.exporter.html.html2html_exporter import Html2HtmlExporter
 from docutranslate.glossary.glossary import Glossary
 
 from docutranslate.ir.document import Document
 from docutranslate.translator.ai_translator.html_translator import HtmlTranslatorConfig, HtmlTranslator
 from docutranslate.workflow.base import Workflow, WorkflowConfig
-from docutranslate.workflow.interfaces import HTMLExportable
-
+from docutranslate.workflow.interfaces import HTMLExportable, DocxExportable
 
 @dataclass(kw_only=True)
 class HtmlWorkflowConfig(WorkflowConfig):
     translator_config: HtmlTranslatorConfig
+    docx_exporter_config: Html2DocxExporterConfig
 
-
-
-class HtmlWorkflow(Workflow[HtmlWorkflowConfig, Document, Document], HTMLExportable):
+class HtmlWorkflow(Workflow[HtmlWorkflowConfig, Document, Document], HTMLExportable,
+                   DocxExportable[Html2DocxExporterConfig]):
     def __init__(self, config: HtmlWorkflowConfig):
         super().__init__(config=config)
         if config.logger:
@@ -77,4 +77,15 @@ class HtmlWorkflow(Workflow[HtmlWorkflowConfig, Document, Document], HTMLExporta
     def save_as_html(self, name: str = None, output_dir: Path | str = "./output",
                      _: ExporterConfig | None = None) -> Self:
         self._save(exporter=Html2HtmlExporter(), name=name, output_dir=output_dir)
+        return self
+
+    def export_to_docx(self, config: Html2DocxExporterConfig = None) -> bytes:
+        config = config or self.config.docx_exporter_config
+        docu = self._export(Html2DocxExporter(config))
+        return docu.content
+
+    def save_as_docx(self, name: str = None, output_dir: Path | str = "./output",
+                     config: Html2DocxExporterConfig = None) -> Self:
+        config = config or self.config.docx_exporter_config
+        self._save(exporter=Html2DocxExporter(config), name=name, output_dir=output_dir)
         return self

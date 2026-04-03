@@ -94,6 +94,7 @@ from docutranslate.exporter.pptx.pptx2html_exporter import PPTX2HTMLExporterConf
 from docutranslate.workflow.lantern_workflow import LanternWorkflow, LanternWorkflowConfig
 from docutranslate.translator.ai_translator.lantern_translator import LanternTranslatorConfig
 from docutranslate.exporter.lantern.lantern2html_exporter import Lantern2HTMLExporterConfig
+from docutranslate.exporter.html.html2docx_exporter import Html2DocxExporterConfig
 from docutranslate.server.convert import ConvertService, get_convert_service
 MAX_LOG_HISTORY = 200
 
@@ -1049,9 +1050,19 @@ class TranslationService:
             translator_args["glossary_agent_config"] = build_glossary_agent_config()
             translator_config = HtmlTranslatorConfig(**translator_args)
             translator_config.progress_tracker = progress_tracker
+            docx_exporter_config = Html2DocxExporterConfig(export_word_template=False)
+            try:
+                import json
+                extra = json.loads(translator_args["extra_body"])
+                if isinstance(extra, dict):
+                    docx_exporter_config.export_word_template = extra.get("export_word_template", False)
+            except (json.JSONDecodeError, ValueError):
+                self.logger.warning(f"Failed to parse extra_body JSON: {translator_config.extra_body}")
 
             workflow_config = HtmlWorkflowConfig(
-                translator_config=translator_config, logger=task_logger,
+                translator_config=translator_config,
+                docx_exporter_config=docx_exporter_config,
+                logger=task_logger,
                 progress_tracker=progress_tracker,
             )
             return HtmlWorkflow(config=workflow_config)
@@ -1177,6 +1188,15 @@ class TranslationService:
             translator_config.progress_tracker = progress_tracker
 
             html_exporter_config = Lantern2HTMLExporterConfig(cdn=True)
+
+            try:
+                import json
+                extra = json.loads(translator_args["extra_body"])
+                if isinstance(extra, dict):
+                    html_exporter_config.export_html_mode = extra.get("export_html_mode", "default")
+            except (json.JSONDecodeError, ValueError):
+                self.logger.warning(f"Failed to parse extra_body JSON: {translator_config.extra_body}")
+
             workflow_config = LanternWorkflowConfig(
                 translator_config=translator_config,
                 html_exporter_config=html_exporter_config,
@@ -1243,6 +1263,13 @@ class TranslationService:
                     )
             # DocxWorkflow can export docx directly
             elif isinstance(workflow, DocxWorkflow):
+                export_map["docx"] = (
+                    workflow.export_to_docx,
+                    f"{filename_stem}_translated.docx",
+                    False,
+                )
+            # LanternWorkflow can export docx
+            elif isinstance(workflow, LanternWorkflow):
                 export_map["docx"] = (
                     workflow.export_to_docx,
                     f"{filename_stem}_translated.docx",

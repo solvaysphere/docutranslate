@@ -12,7 +12,7 @@ from docutranslate.glossary.glossary import Glossary
 from docutranslate.ir.document import Document
 from docutranslate.translator.ai_translator.lantern_translator import LanternTranslatorConfig, LanternTranslator
 from docutranslate.workflow.base import Workflow, WorkflowConfig
-from docutranslate.workflow.interfaces import LanternExportable, LanternHtmlExportable
+from docutranslate.workflow.interfaces import DocxExportable, HTMLExportable
 
 
 @dataclass(kw_only=True)
@@ -21,8 +21,8 @@ class LanternWorkflowConfig(WorkflowConfig):
     html_exporter_config: Lantern2HTMLExporterConfig
 
 
-class LanternWorkflow(Workflow[LanternWorkflowConfig, Document, Document], LanternHtmlExportable[Lantern2HTMLExporterConfig],
-                   LanternExportable[ExporterConfig]):
+class LanternWorkflow(Workflow[LanternWorkflowConfig, Document, Document], HTMLExportable[Lantern2HTMLExporterConfig],
+                   DocxExportable[ExporterConfig]):
     def __init__(self, config: LanternWorkflowConfig):
         super().__init__(config=config)
         if config.logger:
@@ -32,8 +32,8 @@ class LanternWorkflow(Workflow[LanternWorkflowConfig, Document, Document], Lante
 
     def _pre_translate(self, document_original: Document):
         suffix = document_original.suffix.lower() if document_original.suffix else ""
-        if suffix != ".docx" or suffix != ".html":
-            raise ValueError(f"该工作流不支持{suffix}格式，请转为.docx格式或者.html格式")
+        if suffix != ".docx":
+            raise ValueError(f"该工作流不支持{suffix}格式，请转为.docx格式")
         document = document_original.copy()
         translate_config = self.config.translator_config
         translator = LanternTranslator(translate_config)

@@ -13,6 +13,7 @@
   "workflowOptionJson": "JSON翻译 (.json)",
   "workflowOptionHtml": "HTML翻译 (.html)",
   "workflowOptionPptx": "PPTX演示文稿 (.pptx)",
+  "workflowOptionLantern": "Lantern翻译 (.docx)",
   "autoWorkflowLabel": "自动选择工作流",
   "txtSettingsTitleText": "TXT翻译选项",
   "insertModeLabel": "插入模式",

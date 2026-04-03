@@ -13,6 +13,7 @@
   "workflowOptionJson": "Dịch JSON (.json)",
   "workflowOptionHtml": "Dịch HTML (.html)",
   "workflowOptionPptx": "Thuyết trình PPTX (.pptx)",
+  "workflowOptionLantern": "Lantern DOCX (.docx)",
   "autoWorkflowLabel": "Tự động chọn quy trình",
   "txtSettingsTitleText": "Tùy chọn dịch TXT",
   "insertModeLabel": "Chế độ chèn",

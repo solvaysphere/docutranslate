@@ -256,6 +256,7 @@
                                         <select class="form-select" v-model="form.workflow_type"
                                                 @change="saveSetting('translator_last_workflow', form.workflow_type)">
                                             <option value="markdown_based">{{ t('workflowOptionMarkdown') }}</option>
+                                            <option value="lantern">{{ t('workflowOptionLantern') }}</option>
                                             <option value="docx">{{ t('workflowOptionDocx') }}</option>
                                             <option value="xlsx">{{ t('workflowOptionXlsx') }}</option>
                                             <option value="epub">{{ t('workflowOptionEpub') }}</option>
@@ -1244,6 +1245,8 @@
 <script src="/static/vue.global.prod.js"></script>
 <script src="/static/split.min.js"></script>
 <script src="/static/papaparse.min.js"></script>
+<script src="/static/jszip.min.js"></script>
+<script src="/static/docx-preview.min.js"></script>
 
 <script>
     const {createApp, ref, reactive, computed, watch, onMounted, nextTick} = Vue;
@@ -2266,7 +2269,7 @@
                 setupSyncScroll();
             };
 
-            const openPreview = (task) => {
+            const openPreview = async (task) => {
                 previewTask.value = task;
                 const offcanvas = new bootstrap.Offcanvas(document.getElementById('previewOffcanvas'));
                 offcanvas.show();
@@ -2281,6 +2284,24 @@
                         const iframe = document.createElement('iframe');
                         iframe.src = URL.createObjectURL(task.file);
                         originalPane.value.appendChild(iframe);
+                    } else if (['docx'].includes(ext)) {
+                        try {
+                        //渲染到你的div
+                        await window.docx.renderAsync(
+                          task.file,
+                          originalPane.value, // 渲染容器
+                          originalPane.value, // 辅助容器
+                          {
+                            // className: 'docx-render',
+                            // breakPages: true,
+                            // renderHeaders: true,
+                            // renderFooters: true
+                          }
+                        )
+                      } catch (err) {
+                        console.error('docx预览失败:', err)
+                        originalPane.value.innerHTML = `<p class="p-3 text-muted">${t('preview_cantPreviewType')} (${ext})</p>`;
+                      }
                     } else {
                         originalPane.value.innerHTML = `<p class="p-3 text-muted">${t('preview_cantPreviewType')} (${ext})</p>`;
                     }

@@ -513,6 +513,10 @@ class LanternWorkflowParams(BaseWorkflowParams):
         "\n",
         description="当 insert_mode 为 'append' 或 'prepend' 时，用于分隔原文和译文的分隔符。",
     )
+    export_html_mode: Literal["fish", "default"] = Field(
+        "default",
+        description="导出模式。'default'：默认导出为 Html 文件，'fish'：使用Fish接口转换为 HTML 文件。",
+    )
 
 # --- Lantern WORKFLOW PARAMS END ---
 
