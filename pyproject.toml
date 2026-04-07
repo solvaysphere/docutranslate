@@ -25,6 +25,7 @@ dependencies = [
     "html2text>=2024.2.26",
     "python-dotenv>=1.2.1",
     "pypandoc>=1.17",
+    "pywin32>=311",
 ]
 dynamic = ["version"]
 

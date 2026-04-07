@@ -37,3 +37,15 @@ Output(target language: {to_lang}):
 
 </example>
 Please return the translated JSON directly without including any additional information and preserve special tags or untranslatable elements (such as code, brand names, technical terms) as they are.
+
+
+# 蓝灯鱼模型配置
+BaseUrl: https://apitest.lanternfish.cn/lantern/v1
+ApiKey: https://apitest.lanternfish.cn/lantern/v1
+ModelID: zh-cn_en-us
+
+{"export_html_mode": "fish","export_word_template":true}
+
+# 翻译配置提示词
+翻译时要求是直译，不能是意译（例如：这把尺子不长在翻译时应当翻译为The ruler is not long，而不能翻译为The ruler is short）；
+当句子中出现 [[IMG_N]] 格式的占位符时，保留该占位符并根据英文语法将其放在正确的位置（例如：原文为：一种重力装置，其特征在于，该重力装置符合 [[IMG_N]] 的原理。译文为：A gravity device, wherein the gravity device conforms to the principle of [[IMG_N]].）

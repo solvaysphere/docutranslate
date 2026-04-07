@@ -3,7 +3,7 @@ from typing import (
     Optional,
 )
 
-from docutranslate.exporter.lantern.lantern2docx_exporter import Lantern2DocxExporter
+from docutranslate.exporter.html.html2docx_exporter import Html2DocxExporterConfig, Html2DocxExporter
 from docutranslate.exporter.lantern.lantern2html_exporter import Lantern2HTMLExporter, Lantern2HTMLExporterConfig
 from docutranslate.ir.document import Document
 
@@ -32,7 +32,8 @@ class ConvertService:
         return docu.content.decode()
 
     def convert_to_word(self, document: Document):
-        exporter = Lantern2DocxExporter()
+        config = Html2DocxExporterConfig(export_word_template = True)
+        exporter = Html2DocxExporter(config)
         docu = exporter.export(document)
         return docu.content
 
